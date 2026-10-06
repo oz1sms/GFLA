@@ -4,7 +4,7 @@
 * Hurtig-knapper: +10 Button, -10 Button, +1 Button, -1 Button
 * IDE: Arduino IDE
 *
-* 
+* Hello world 
 */
 
 #include <Wire.h>
