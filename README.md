@@ -11,7 +11,7 @@ This system makes it easy to motorize the Z-axis of your fiber laser. It feature
 * **Material Height:** Input the thickness of your workpiece, and the Z-axis adjusts accordingly.
 * **Steel Color Offsets:** Save up to 4 unique Z-offsets to achieve perfect tempering colors on steel. Includes a quick "Off" function to disable offsets.
 * **3D Auto Engraving:** Set the depth, minutes, and seconds. The system gradually lowers the Z-axis automatically during engraving, activated and safely monitored via a foot pedal.
-* **Quick-Jog Buttons:** 4 physical push-buttons for manual jog control (+10mm, -10mm, +1mm, -1mm).
+* **Quick Buttons:** 4 physical push-buttons for quick (+10mm, -10mm, +1mm, -1mm).
 * **Auto-Homing:** Automatically finds the top position using an endstop switch on startup.
 
 ---
