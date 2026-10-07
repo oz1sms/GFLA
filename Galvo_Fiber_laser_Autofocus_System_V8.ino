@@ -1,10 +1,9 @@
 /*
 * Galvo Fiber Laser Autofocus Control System Ver. 8 (Open-Source Edition)
 * Hardware ESP32-WROOM-DA, OLED SSD1309 display i2c (128x64), EC11 Encoder, Endstop
-* Quick-buttons: +10 Button, -10 Button, +1 Button, -1 Button
+* Quick-buttons: 2 on-off-on momentary switch (+10/10 , +1/-1)  
+* Footpedal Button on-off momentary switch 
 * IDE: Arduino IDE
-*
-* 
 */
 
 #include <Wire.h>
@@ -40,6 +39,12 @@ DIYables_OLED_SSD1309 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define STEP_PIN 25
 #define DIR_PIN 26
 #define EN_PIN 27
+
+
+unsigned long lastInteractionTime = 0;
+const unsigned long SCREENSAVER_TIMEOUT = 300000; // 5 minutter i millisekunder (5 * 60 * 1000)
+bool screensaverActive = false;
+
 
 // --- ESP32 Foot pedal and Relay setup ---
 const int buttonPin = 4; 
@@ -155,11 +160,31 @@ void IRAM_ATTR handleFootPedal() {
  }
 }
 
+void handleScreensaver() {
+  if (millis() - lastInteractionTime > SCREENSAVER_TIMEOUT) {
+    if (!screensaverActive) {
+      display.clearDisplay();
+      // Her kan du evt. tegne et lille logo eller blot lade den være sort
+      display.display();
+      display.ssd1309_command(0x81); // Kontrast kommando
+      display.ssd1309_command(0x00); // Dæmp skærmen (0-255)
+      screensaverActive = true;
+    }
+  } else {
+    if (screensaverActive) {
+      display.ssd1309_command(0x81); // Kontrast kommando
+      display.ssd1309_command(0xCF); // Sæt lysstyrke tilbage til normal (~207)
+      screensaverActive = false;
+      updateDisplay(); // Opdater skærmen så menuen kommer tilbage
+    }
+  }
+}
 
 void setup() {
  Serial.begin(115200);
  Serial.println("System starting...");
- 
+
+
  // Pin configurations
  pinMode(ENCODER_CLK, INPUT_PULLUP);
  pinMode(ENCODER_DT, INPUT_PULLUP);
@@ -235,6 +260,9 @@ void setup() {
 }
 
 void loop() {
+
+handleScreensaver(); // Tjekker om screensaveren skal aktiveres
+
  // --- 3D Auto Engraving Logic Execution ---
  if (currentState == ENGRAVE_3D_AUTO) {
  if (engraveAutoSetupStep == 3) {
@@ -318,6 +346,10 @@ void handleEncoder() {
  int clkVal = digitalRead(ENCODER_CLK); 
  if (clkVal != lastClkVal && clkVal == LOW) { 
  int direction = (digitalRead(ENCODER_DT) != clkVal) ? 1 : -1; 
+
+lastInteractionTime = millis(); // Nulstil screensaver timer
+
+lastInteractionTime = millis(); // Nulstil screensaver timer
 
  switch(currentState) { 
  case STATUS_SCREEN:
@@ -505,17 +537,21 @@ void updateDisplay() {
  return;
  }
 
- // --- OPERATIONAL TOP-BAR FOR NORMAL MENUS ---
- // (The header is printed ONLY if we are NOT in the SETUP_MENU or 3D Auto)
- if (currentState != SETUP_MENU && currentState != ENGRAVE_3D_AUTO) {
- display.setCursor(0, 0);
- display.print("LENS:");
- display.print(lensNames[settings.selectedLens]);
- display.print(" COL:"); // Adds a small space after the lens and writes "COL: "
- display.print(colorNames[settings.selectedColorIndex]); // Prints the selected color or "Off"
- display.drawFastHLine(0, 10, 128, SSD1309_WHITE);
- }
- 
+// --- OPERATIONAL TOP-BAR FOR NORMAL MENUS ---
+// (The header is printed ONLY if we are NOT in the SETUP_MENU or 3D Auto)
+if (currentState != SETUP_MENU && currentState != ENGRAVE_3D_AUTO) {
+  display.setCursor(0, 0);
+  display.print("LENS:");
+  display.print(lensNames[settings.selectedLens]);
+  
+  // Tjekker om farven er "Off" (index 0). Viser kun teksten, hvis en anden farve er valgt.
+  if (settings.selectedColorIndex != 0) {
+    display.print(" COL:"); 
+    display.print(colorNames[settings.selectedColorIndex]); 
+  }
+  
+  display.drawFastHLine(0, 10, 128, SSD1309_WHITE);
+} 
  switch(currentState) {
  case STATUS_SCREEN: {
  float currentPosFromTopMM = (float)stepper.currentPosition() / STEPS_PER_MM;
