@@ -3,7 +3,8 @@
 
 An open-source, ESP32-based autofocus and Z-axis control system for Galvo fiber lasers. 
 
-This system makes it easy to motorize the Z-axis of your fiber laser. It features a built-in setup wizard, the ability to save focal lengths for multiple lenses, material height adjustment, Z-offsets for steel colors, and a dedicated automatic 3D engraving function controlled via a foot pedal and a relay.
+This system makes it easy to motorize the Z-axis of your fiber laser. It features a built-in setup wizard, the ability to save focal lengths for multiple lenses, material height adjustment, Z-offsets for steel colors, and a dedicated automatic 3D engraving function controlled via a switch and a relay to aktivate marking in Lightburn via a relay connectet to footpedal input on laser controler.
+
 
 ## 🚀 Features
 * **Screen & Menu:** 128x64 OLED display (SSD1309) with a full menu navigated via an EC11 rotary encoder.
