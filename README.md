@@ -43,8 +43,8 @@ This system makes it easy to motorize the Z-axis of your fiber laser. It feature
 | STEP | `GPIO 25` | (TMC2160 or similar) |
 | DIR | `GPIO 26` | |
 | ENABLE | `GPIO 27` | Active Low (`LOW` = Enabled) |
-| **Foot Pedal & Relay** | | |
-| Pedal | `GPIO 4` | INPUT_PULLUP |
+| **Red switch & Relay** | | |
+| Red switch | `GPIO 4` | INPUT_PULLUP |
 | Relay | `GPIO 23` | Active Low |
 | **Endstop** | | |
 | Top Endstop | `GPIO 33` | INPUT_PULLUP |
