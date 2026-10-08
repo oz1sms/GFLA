@@ -85,8 +85,8 @@ const char* colorNames[TOTAL_COLORS] = { "Off", "1", "2", "3", "4" };
 
 // Menu system structures for UI navigation
 enum State { 
-STATUS_SCREEN, MAIN_MENU, MAT_HEIGHT_MENU, LENS_MENU, ENGRAVE_3D_MENU, ENGRAVE_3D_AUTO, COLOR_MENU, 
-SETUP_MENU, CALIBRATE_HEIGHT_MENU, CALIBRATE_LENS_MENU, COLOR_OFFSET_MENU, 
+STATUS_SCREEN, MAIN_MENU, MAT_HEIGHT_MENU, LENS_MENU, CALIBRATE_LENS_MENU, ENGRAVE_3D_AUTO, COLOR_MENU, 
+SETUP_MENU, CALIBRATE_HEIGHT_MENU, EDIT_LENS_MENU, COLOR_OFFSET_MENU, 
 WIZARD_WELCOME, WIZARD_HOMING, WIZARD_HEIGHT, WIZARD_LENSES 
 };
 
@@ -385,8 +385,8 @@ lastInteractionTime = millis(); // Nulstil screensaver timer
  settings.selectedLens = constrain(settings.selectedLens + direction, 0, TOTAL_LENSES - 1); 
  break; 
 
- case ENGRAVE_3D_MENU: { 
- long steps = direction * (0.05 * STEPS_PER_MM); 
+ case CALIBRATE_LENS_MENU: { 
+ long steps = direction * (0.01 * STEPS_PER_MM); 
  stepper.move(steps); 
  break; 
  } 
@@ -397,8 +397,8 @@ lastInteractionTime = millis(); // Nulstil screensaver timer
  } else if (engraveAutoSetupStep == 1) {
  engraveAutoSeconds = constrain(engraveAutoSeconds + direction, 0, 59);
  } else if (engraveAutoSetupStep == 2) {
- // Adjusts by 0.05 mm per click. Limited to max 5mm.
- engraveAutoDepth = constrain(engraveAutoDepth + (direction * 0.05), 0.0, 5.0);
+ // Adjusts by 0.01 mm per click. Limited to max 5mm.
+ engraveAutoDepth = constrain(engraveAutoDepth + (direction * 0.01), 0.0, 5.0);
  }
  break;
 
@@ -415,7 +415,7 @@ lastInteractionTime = millis(); // Nulstil screensaver timer
  settings.maxPhysicalHeight = constrain(settings.maxPhysicalHeight + (direction * 0.1), 50.0, 600.0); 
  break; 
 
- case CALIBRATE_LENS_MENU: 
+ case EDIT_LENS_MENU: 
  if (!editingLensValue) { 
  calibrateLensSelectIndex = constrain(calibrateLensSelectIndex + direction, 0, TOTAL_LENSES); 
  } else { 
@@ -444,7 +444,7 @@ void handleQuickButtons() {
  currentState != WIZARD_LENSES && 
  currentState != MAT_HEIGHT_MENU &&
  currentState != CALIBRATE_HEIGHT_MENU && 
- currentState != CALIBRATE_LENS_MENU) {
+ currentState != EDIT_LENS_MENU) {
  return; // Abort immediately if we are in another menu (e.g., MAT_HEIGHT, STATUS_SCREEN, etc.)
  }
 
@@ -480,7 +480,7 @@ void handleQuickButtons() {
  settings.lensFocusDistances[wizardLensIndex] = constrain(settings.lensFocusDistances[wizardLensIndex] + adjustment, 0.0, 530.0);
  break;
 
- case CALIBRATE_LENS_MENU:
+ case EDIT_LENS_MENU:
  // Adjust focus distance for the selected lens in the calibration menu (while editing)
  if (editingLensValue && calibrateLensSelectIndex < TOTAL_LENSES) {
  settings.lensFocusDistances[calibrateLensSelectIndex] = constrain(settings.lensFocusDistances[calibrateLensSelectIndex] + adjustment, 0.0, 530.0);
@@ -651,8 +651,8 @@ if (currentState != SETUP_MENU && currentState != ENGRAVE_3D_AUTO) {
  display.print("Turn to change"); 
  display.setCursor(0, 56); display.print("Press Encoder: Next"); 
  } else if (engraveAutoSetupStep == 3) {
- display.print("READY! Start Laser.."); 
- display.setCursor(0, 56); display.print("Press Pedal -> Dive"); 
+ display.print("Prepare Lightburn"); 
+ display.setCursor(0, 56); display.print("Red GO / Press EXIT"); 
  } else if (engraveAutoSetupStep == 4) {
  display.print("DIVING DOWN..."); 
  } else if (engraveAutoSetupStep == 5) {
@@ -664,13 +664,13 @@ if (currentState != SETUP_MENU && currentState != ENGRAVE_3D_AUTO) {
  break;
  }
 
- case ENGRAVE_3D_MENU: {
+ case CALIBRATE_LENS_MENU: {
  // Calculate the current focus distance
  float currentPosFromTopMM = (float)stepper.currentPosition() / STEPS_PER_MM;
  float currentPosMM = settings.maxPhysicalHeight - currentPosFromTopMM;
 
  // Print header (shifted up to make space)
- display.setCursor(87, 0); display.print("3D");
+ display.setCursor(87, 0); display.print("Calib.");
  
  // Print the focus distance
  display.setCursor(10, 18); display.print("Focus: ");
@@ -678,7 +678,7 @@ if (currentState != SETUP_MENU && currentState != ENGRAVE_3D_AUTO) {
  display.print(" mm");
  
  // Print instructions
- display.setCursor(10, 36); display.print("Turn: +/- 0.05mm");
+ display.setCursor(10, 36); display.print("Turn: +/- 0.01mm");
  display.setCursor(10, 52); display.print("Press SW to exit");
  break;
  }
@@ -720,7 +720,7 @@ if (currentState != SETUP_MENU && currentState != ENGRAVE_3D_AUTO) {
  display.setCursor(15, 40); display.print(settings.maxPhysicalHeight, 1); display.print(" mm");
  break;
 
- case CALIBRATE_LENS_MENU:
+ case EDIT_LENS_MENU:
  display.setCursor(0, 12); display.print("Edit Lens Focus Dist:");
  for(int i = 0; i < TOTAL_LENSES; i++) {
  int yPos = 21 + (i * 6);
@@ -937,7 +937,7 @@ void handleButtons() {
    executeHome(); 
    currentState = CALIBRATE_HEIGHT_MENU;
  } else if (setupMenuIndex == 1) {
-   currentState = CALIBRATE_LENS_MENU;
+   currentState = EDIT_LENS_MENU;
    calibrateLensSelectIndex = 0;
    editingLensValue = false;
  } else if (setupMenuIndex == 2) {
@@ -949,7 +949,7 @@ void handleButtons() {
    currentState = WIZARD_WELCOME;
  } else if (setupMenuIndex == 4) { 
    // 5. Calibrate Focus (Tidligere "Manual Mode")
-   currentState = ENGRAVE_3D_MENU; 
+   currentState = CALIBRATE_LENS_MENU; 
    engraveMenuIndex = 0; // Tvinger den ind i Manual opsætningen
  } else if (setupMenuIndex == 5) { 
    // 6. Back / Exit to Main Menu
@@ -963,7 +963,7 @@ void handleButtons() {
  currentState = SETUP_MENU;
  break;
 
- case CALIBRATE_LENS_MENU:
+ case EDIT_LENS_MENU:
  if (calibrateLensSelectIndex == TOTAL_LENSES) {
  currentState = SETUP_MENU;
  } else {
@@ -1007,7 +1007,7 @@ void handleButtons() {
  }
  break;
  case MAT_HEIGHT_MENU:
- case ENGRAVE_3D_MENU:
+ case CALIBRATE_LENS_MENU:
  case COLOR_MENU:
  saveSettings(); 
  currentState = STATUS_SCREEN;
