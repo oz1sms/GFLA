@@ -1,0 +1,2 @@
+Upgrade system to use MKS-SERVO-57D-RS485 closed loop stepper driver
+Add a optisk sensor on MKS57D for fast reference, with long flag, use the old top switch as limmit switch top, and add a limmit switch at bottom
