@@ -52,11 +52,9 @@ unsigned long lastInteractionTime = 0;
 const unsigned long SCREENSAVER_TIMEOUT = 300000; // 5 minutter i millisekunder (5 * 60 * 1000)
 bool screensaverActive = false;
 
-
 // --- ESP32 Foot pedal and Relay setup ---
 const int buttonPin = 4; 
 const int relayPin = 23; 
-// (lastDebounceTime and debounceDelay variables are no longer needed)
 
 // --- 3D Auto Engraving Variables ---
 int engraveAutoMinutes = 0;
@@ -67,7 +65,6 @@ int engraveAutoSetupStep = 0;
 unsigned long engraveStartTime = 0;
 long engraveStartPos = 0;
 
-
 // Stepper motor configuration (4mm per revolution @ 16 microsteps = 3200 steps)
 const float STEPS_PER_MM = 800.0;
 AccelStepper stepper(AccelStepper::DRIVER, STEP_PIN, DIR_PIN);
@@ -76,7 +73,6 @@ AccelStepper stepper(AccelStepper::DRIVER, STEP_PIN, DIR_PIN);
 const int TOTAL_LENSES = 3; // Max capacity is 6 lenses
 
 // Names of the default lenses
-//const char* lensNames[TOTAL_LENSES] = { "70x70", "110x110", "150x150", "175x175", "200x200", "300x300" };
 const char* lensNames[TOTAL_LENSES] = { "70x70", "110x110", "150x150" };
 
 const int TOTAL_COLORS = 5;
@@ -87,7 +83,7 @@ const char* colorNames[TOTAL_COLORS] = { "Off", "1", "2", "3", "4" };
 enum State { 
 STATUS_SCREEN, MAIN_MENU, MAT_HEIGHT_MENU, LENS_MENU, CALIBRATE_LENS_MENU, ENGRAVE_3D_AUTO, COLOR_MENU, 
 SETUP_MENU, CALIBRATE_HEIGHT_MENU, EDIT_LENS_MENU, COLOR_OFFSET_MENU, 
-WIZARD_WELCOME, WIZARD_HOMING, WIZARD_HEIGHT, WIZARD_LENSES 
+WIZARD_WELCOME, WIZARD_HOMING, WIZARD_HEIGHT, WIZARD_LENSES, CONFIRM_SAVE_FOCUS
 };
 
 State currentState = STATUS_SCREEN;
@@ -140,7 +136,6 @@ bool editingLensValue = false;
 bool editingColorValue = false; // Added state
 int wizardLensIndex = 0; 
 
-
 // Function prototypes
 void updateDisplay();
 void saveSettings();
@@ -154,17 +149,14 @@ void hardware_stepper_run_block();
 
 // Interrupt routine for the foot pedal
 void IRAM_ATTR handleFootPedal() {
- // Wait 10,000 microseconds (10 ms) for the switch to settle completely.
- // This solves the "sticking" issue without missing the final state.
  delayMicroseconds(10000); 
 
- // Read the stable state
  bool isPressed = (digitalRead(buttonPin) == LOW);
  
  if (isPressed) {
- digitalWrite(relayPin, LOW); // TURNS ON the relay (Active-Low configuration)
+ digitalWrite(relayPin, LOW); 
  } else {
- digitalWrite(relayPin, HIGH); // TURNS OFF the relay (Active-Low configuration)
+ digitalWrite(relayPin, HIGH); 
  }
 }
 
@@ -172,7 +164,6 @@ void handleScreensaver() {
   if (millis() - lastInteractionTime > SCREENSAVER_TIMEOUT) {
     if (!screensaverActive) {
       display.clearDisplay();
-      // Her kan du evt. tegne et lille logo eller blot lade den være sort
       display.display();
       display.ssd1309_command(0x81); // Kontrast kommando
       display.ssd1309_command(0x00); // Dæmp skærmen (0-255)
@@ -180,10 +171,10 @@ void handleScreensaver() {
     }
   } else {
     if (screensaverActive) {
-      display.ssd1309_command(0x81); // Kontrast kommando
-      display.ssd1309_command(0xCF); // Sæt lysstyrke tilbage til normal (~207)
+      display.ssd1309_command(0x81); 
+      display.ssd1309_command(0xCF); 
       screensaverActive = false;
-      updateDisplay(); // Opdater skærmen så menuen kommer tilbage
+      updateDisplay(); 
     }
   }
 }
@@ -191,7 +182,6 @@ void handleScreensaver() {
 void setup() {
  Serial.begin(115200);
  Serial.println("System starting...");
-
 
  // Pin configurations
  pinMode(ENCODER_CLK, INPUT_PULLUP);
@@ -211,7 +201,7 @@ void setup() {
  stepper.setMaxSpeed(3000);
  stepper.setAcceleration(1500);
  
- // 1. Set up the relay and turn it OFF immediately (HIGH = off on your specific relay)
+ // 1. Set up the relay and turn it OFF immediately
  pinMode(relayPin, OUTPUT);
  digitalWrite(relayPin, HIGH); 
 
@@ -222,7 +212,7 @@ void setup() {
  // Initialize OLED display
  if(!display.begin(SSD1309_SWITCHCAPVCC, 0x3C)) { 
  Serial.println(F("SSD1309 allocation failed"));
- for(;;); // Halt execution if display fails
+ for(;;); 
  }
  display.clearDisplay();
  display.setTextColor(SSD1309_WHITE);
@@ -233,7 +223,6 @@ void setup() {
  } else {
  EEPROM.get(EEPROM_ADDR, settings);
 
- // Check if EEPROM is empty, corrupted, or if the machine has never been calibrated
  if (settings.isCalibrated != true || isnan(settings.materialHeight) || settings.selectedLens < 0 || settings.selectedLens >= TOTAL_LENSES) {
  Serial.println("No valid data found. Starting First-Time Setup Wizard...");
  
@@ -242,9 +231,8 @@ void setup() {
  settings.materialHeight = 0.0;
  settings.selectedColorIndex = 0;
  settings.currentPositionSteps = 0;
- settings.maxPhysicalHeight = 515.0; // Default starting value for testing
+ settings.maxPhysicalHeight = 515.0; 
  
- // Default starting focus values for the 6 lenses
  settings.lensFocusDistances[0] = 100.0; // 70x70
  settings.lensFocusDistances[1] = 160.0; // 110x110
  settings.lensFocusDistances[2] = 210.0; // 150x150
@@ -256,7 +244,7 @@ void setup() {
  settings.colorOffsets[i] = 0.0;
  }
  
- currentState = WIZARD_WELCOME; // Force the user into the setup wizard
+ currentState = WIZARD_WELCOME; 
  } else {
  stepper.setCurrentPosition(settings.currentPositionSteps);
  currentState = STATUS_SCREEN;
@@ -269,7 +257,7 @@ void setup() {
 
 void loop() {
 
-handleScreensaver(); // Tjekker om screensaveren skal aktiveres
+handleScreensaver(); 
 
  // --- 3D Auto Engraving Logic Execution ---
  if (currentState == ENGRAVE_3D_AUTO) {
@@ -293,48 +281,33 @@ handleScreensaver(); // Tjekker om screensaveren skal aktiveres
  }
  } 
  else if (engraveAutoSetupStep == 4) {
- // Safety override if the pedal is released prematurely (Currently commented out)
- /* 
- if (digitalRead(relayPin) == HIGH) {
- stepper.setMaxSpeed(3000); 
- stepper.moveTo(engraveStartPos); // Set target to start position
- engraveAutoSetupStep = 5; // Switch to "Returning" state
- updateDisplay();
- return; 
- }
- */
-
- unsigned long totalTimeMs = (engraveAutoMinutes * 60UL + engraveAutoSeconds) * 1000UL;
- unsigned long elapsed = millis() - engraveStartTime;
+  unsigned long totalTimeMs = (engraveAutoMinutes * 60UL + engraveAutoSeconds) * 1000UL;
+  unsigned long elapsed = millis() - engraveStartTime;
  
  if (elapsed <= totalTimeMs) {
- stepper.runSpeed(); // Drives slowly downwards based on calculated speed
+ stepper.runSpeed(); 
  } else {
- // Time is up, start returning process!
  stepper.setMaxSpeed(3000); 
- stepper.moveTo(engraveStartPos); // Command motor to return to starting height
- engraveAutoSetupStep = 5; // New state: Returning
+ stepper.moveTo(engraveStartPos); 
+ engraveAutoSetupStep = 5; 
  updateDisplay();
  }
  }
  else if (engraveAutoSetupStep == 5) {
- // Returning quickly to the start position
  if (stepper.distanceToGo() != 0) {
- stepper.run(); // Normal execution with acceleration upwards
+ stepper.run(); 
  } else {
- engraveAutoSetupStep = 6; // Completely finished status
+ engraveAutoSetupStep = 6; 
  updateDisplay();
  }
  } 
  else {
- // Normal motor control during input or when 'Finished'
  stepper.run();
  }
  } else {
  stepper.run(); 
  }
 
- // Continuously poll hardware inputs
  handleEncoder();
  handleButtons();
  handleQuickButtons();
@@ -348,20 +321,16 @@ void saveSettings() {
  Serial.println("Settings autosaved to EEPROM.");
 }
 
-
 // Handles rotary encoder turns based on the current active screen
 void handleEncoder() { 
  int clkVal = digitalRead(ENCODER_CLK); 
  if (clkVal != lastClkVal && clkVal == LOW) { 
  int direction = (digitalRead(ENCODER_DT) != clkVal) ? 1 : -1; 
 
-lastInteractionTime = millis(); // Nulstil screensaver timer
-
-lastInteractionTime = millis(); // Nulstil screensaver timer
+ lastInteractionTime = millis(); 
 
  switch(currentState) { 
  case STATUS_SCREEN:
- // EC11 does nothing on the main status screen
  break;
 
  case MAIN_MENU: 
@@ -386,10 +355,16 @@ lastInteractionTime = millis(); // Nulstil screensaver timer
  break; 
 
  case CALIBRATE_LENS_MENU: { 
- long steps = direction * (0.01 * STEPS_PER_MM); 
+  long steps = direction * (0.01 * STEPS_PER_MM); 
  stepper.move(steps); 
  break; 
  } 
+ 
+ case CONFIRM_SAVE_FOCUS:
+ confirmSaveIndex += direction;
+ if (confirmSaveIndex < 0) confirmSaveIndex = 1;
+ if (confirmSaveIndex > 1) confirmSaveIndex = 0;
+ break;
 
  case ENGRAVE_3D_AUTO:
  if (engraveAutoSetupStep == 0) {
@@ -397,7 +372,6 @@ lastInteractionTime = millis(); // Nulstil screensaver timer
  } else if (engraveAutoSetupStep == 1) {
  engraveAutoSeconds = constrain(engraveAutoSeconds + direction, 0, 59);
  } else if (engraveAutoSetupStep == 2) {
- // Adjusts by 0.01 mm per click. Limited to max 5mm.
  engraveAutoDepth = constrain(engraveAutoDepth + (direction * 0.01), 0.0, 5.0);
  }
  break;
@@ -436,16 +410,14 @@ lastInteractionTime = millis(); // Nulstil screensaver timer
  lastClkVal = clkVal; 
 }
 
-// Processes quick action buttons (+10, -10, +1, -1) for fast adjustments
 void handleQuickButtons() {
- // ONLY allow quick-buttons in these 5 specific modes
  if (currentState != WIZARD_HOMING && 
  currentState != WIZARD_HEIGHT && 
  currentState != WIZARD_LENSES && 
  currentState != MAT_HEIGHT_MENU &&
  currentState != CALIBRATE_HEIGHT_MENU && 
  currentState != EDIT_LENS_MENU) {
- return; // Abort immediately if we are in another menu (e.g., MAT_HEIGHT, STATUS_SCREEN, etc.)
+ return; 
  }
 
  float adjustment = 0.0;
@@ -455,51 +427,43 @@ void handleQuickButtons() {
  else if (digitalRead(BTN_MINUS_1) == LOW) adjustment = -1.0;
 
  if (adjustment != 0.0) {
- if (millis() - lastButtonPress > 200) { 
+  if (millis() - lastButtonPress > 200) { 
  lastButtonPress = millis();
 
  switch(currentState) {
  case WIZARD_HOMING:
- // Manual height adjustment is ignored during Homing
  break;
 
  case MAT_HEIGHT_MENU:
- // Adjust the material height and physically move the stepper motor
  settings.materialHeight = constrain(settings.materialHeight + adjustment, 0.0, settings.maxPhysicalHeight);
  moveToCalculatedFocus(); 
  break;
 
  case WIZARD_HEIGHT:
  case CALIBRATE_HEIGHT_MENU:
- // Adjust the maximum physical Z-height constraint
  settings.maxPhysicalHeight = constrain(settings.maxPhysicalHeight + adjustment, 50.0, 600.0);
  break;
 
  case WIZARD_LENSES:
- // Adjust the focus distance for the selected lens during the Wizard
  settings.lensFocusDistances[wizardLensIndex] = constrain(settings.lensFocusDistances[wizardLensIndex] + adjustment, 0.0, 530.0);
  break;
 
  case EDIT_LENS_MENU:
- // Adjust focus distance for the selected lens in the calibration menu (while editing)
  if (editingLensValue && calibrateLensSelectIndex < TOTAL_LENSES) {
  settings.lensFocusDistances[calibrateLensSelectIndex] = constrain(settings.lensFocusDistances[calibrateLensSelectIndex] + adjustment, 0.0, 530.0);
  }
  break;
  }
-
  updateDisplay();
  }
  }
 }
 
-// Updates the OLED screen based on the current system state
 void updateDisplay() {
  display.clearDisplay();
  display.setTextSize(1);
  display.setTextColor(SSD1309_WHITE);
  
- // --- BLOCKING SPECIAL SCREENS FOR THE WIZARD ---
  if (currentState == WIZARD_WELCOME) {
  display.setCursor(15, 5); display.print("GALVO FOCUS OS");
  display.drawFastHLine(0, 15, 128, SSD1309_WHITE);
@@ -541,14 +505,11 @@ void updateDisplay() {
  return;
  }
 
-// --- OPERATIONAL TOP-BAR FOR NORMAL MENUS ---
-// (The header is printed ONLY if we are NOT in the SETUP_MENU or 3D Auto)
-if (currentState != SETUP_MENU && currentState != ENGRAVE_3D_AUTO) {
+if (currentState != SETUP_MENU && currentState != ENGRAVE_3D_AUTO && currentState != CONFIRM_SAVE_FOCUS) {
   display.setCursor(0, 0);
   display.print("LENS:");
   display.print(lensNames[settings.selectedLens]);
   
-  // Tjekker om farven er "Off" (index 0). Viser kun teksten, hvis en anden farve er valgt.
   if (settings.selectedColorIndex != 0) {
     display.print(" COL:"); 
     display.print(colorNames[settings.selectedColorIndex]); 
@@ -556,10 +517,11 @@ if (currentState != SETUP_MENU && currentState != ENGRAVE_3D_AUTO) {
   
   display.drawFastHLine(0, 10, 128, SSD1309_WHITE);
 } 
+
  switch(currentState) {
  case STATUS_SCREEN: {
  float currentPosFromTopMM = (float)stepper.currentPosition() / STEPS_PER_MM;
- float currentPosMM = settings.maxPhysicalHeight - currentPosFromTopMM;
+  float currentPosMM = settings.maxPhysicalHeight - currentPosFromTopMM;
  
  display.setCursor(0, 15); display.print("Focus Dist:"); 
  display.setCursor(72, 15); display.print(currentPosMM, 2); display.print(" mm");
@@ -568,7 +530,6 @@ if (currentState != SETUP_MENU && currentState != ENGRAVE_3D_AUTO) {
  display.setCursor(72, 28); display.print(settings.materialHeight, 2); display.print(" mm");
  
  display.drawFastHLine(0, 42, 128, SSD1309_WHITE);
- // display.setCursor(0, 46); display.print("Turn Adjust Z +/-0.05");
  display.setCursor(0, 56); display.print("Press: Mainmenu");
  break;
  }
@@ -615,7 +576,7 @@ if (currentState != SETUP_MENU && currentState != ENGRAVE_3D_AUTO) {
  display.print("OFF");
  } else {
  display.print("# "); 
- display.print(settings.selectedColorIndex); // Added mapping offset
+ display.print(settings.selectedColorIndex); 
  }
  break;
 
@@ -624,25 +585,21 @@ if (currentState != SETUP_MENU && currentState != ENGRAVE_3D_AUTO) {
  display.print("3D AUTO ENGRAVING");
  display.drawFastHLine(0, 10, 128, SSD1309_WHITE);
  
- // Displays Minutes
  if (engraveAutoSetupStep == 0) display.setTextColor(SSD1309_BLACK, SSD1309_WHITE);
  else display.setTextColor(SSD1309_WHITE);
  display.setCursor(0, 15);
  display.print("Min: "); display.print(engraveAutoMinutes);
  
- // Displays Seconds
  if (engraveAutoSetupStep == 1) display.setTextColor(SSD1309_BLACK, SSD1309_WHITE);
  else display.setTextColor(SSD1309_WHITE);
  display.setCursor(64, 15);
  display.print("Sec: "); display.print(engraveAutoSeconds); 
  
- // Displays Depth (mm)
  if (engraveAutoSetupStep == 2) display.setTextColor(SSD1309_BLACK, SSD1309_WHITE);
  else display.setTextColor(SSD1309_WHITE);
  display.setCursor(0, 28);
  display.print("Depth: "); display.print(engraveAutoDepth, 2); display.print(" mm"); 
 
- // Displays bottom menu helper
  display.setTextColor(SSD1309_WHITE);
  display.drawFastHLine(0, 42, 128, SSD1309_WHITE);
  display.setCursor(0, 46);
@@ -665,29 +622,46 @@ if (currentState != SETUP_MENU && currentState != ENGRAVE_3D_AUTO) {
  }
 
  case CALIBRATE_LENS_MENU: {
- // Calculate the current focus distance
  float currentPosFromTopMM = (float)stepper.currentPosition() / STEPS_PER_MM;
- float currentPosMM = settings.maxPhysicalHeight - currentPosFromTopMM;
+  float currentPosMM = settings.maxPhysicalHeight - currentPosFromTopMM;
 
- // Print header (shifted up to make space)
  display.setCursor(87, 0); display.print("Calib.");
  
- // Print the focus distance
  display.setCursor(10, 18); display.print("Focus: ");
  display.print(currentPosMM, 2); 
  display.print(" mm");
  
- // Print instructions
  display.setCursor(10, 36); display.print("Turn: +/- 0.01mm");
- display.setCursor(10, 52); display.print("Press SW to exit");
+ display.setCursor(10, 52); display.print("Press SW to save");
  break;
  }
+ 
+ case CONFIRM_SAVE_FOCUS: {
+  display.setTextSize(1);
+  display.setCursor(0, 0);
+  display.println(F("Gem ny fokus for:"));
+  display.println(lensNames[settings.selectedLens]);
+  display.println("");
+  
+  if (confirmSaveIndex == 0) {
+    display.setTextColor(SSD1309_BLACK, SSD1309_WHITE);
+    display.println(F("> JA, GEM   "));
+    display.setTextColor(SSD1309_WHITE, SSD1309_BLACK);
+    display.println(F("  NEJ, ANNULLER"));
+  } else {
+    display.setTextColor(SSD1309_WHITE, SSD1309_BLACK);
+    display.println(F("  JA, GEM   "));
+    display.setTextColor(SSD1309_BLACK, SSD1309_WHITE);
+    display.println(F("> NEJ, ANNULLER"));
+  }
+  break;
+ }
+
  case SETUP_MENU: {
  display.setCursor(10, 0); 
  display.print("--- SETUP MENU ---");
  display.drawFastHLine(0, 10, 128, SSD1309_WHITE);
 
- // Calculate which 4 lines to display (scroll mechanism)
  int startIdx = 0;
  if (setupMenuIndex >= 4) {
  startIdx = setupMenuIndex - 3;
@@ -743,7 +717,7 @@ if (currentState != SETUP_MENU && currentState != ENGRAVE_3D_AUTO) {
  case COLOR_OFFSET_MENU:
  display.setCursor(0, 12); display.print("Edit Color Offsets:");
  for(int i = 1; i < TOTAL_COLORS; i++) {
- int yPos = 23 + ((i - 1) * 8);
+  int yPos = 23 + ((i - 1) * 8);
  display.setCursor(2, yPos);
  if(i == calibrateColorSelectIndex) {
  if(editingColorValue) display.print("# ");
@@ -766,24 +740,21 @@ if (currentState != SETUP_MENU && currentState != ENGRAVE_3D_AUTO) {
  display.display();
 }
 
-
-// Calculates target stepper position based on active lens, material height, and color offset
 void moveToCalculatedFocus() {
  if (!settings.isCalibrated) return; 
 
  float baseFocus = settings.lensFocusDistances[settings.selectedLens];
- float targetMM = baseFocus + settings.materialHeight - settings.colorOffsets[settings.selectedColorIndex];
+  float targetMM = baseFocus + settings.materialHeight + settings.colorOffsets[settings.selectedColorIndex];
  
  if (targetMM > settings.maxPhysicalHeight) targetMM = settings.maxPhysicalHeight;
  if (targetMM < 0) targetMM = 0;
 
- float mmFromTop = settings.maxPhysicalHeight - targetMM;
+  float mmFromTop = settings.maxPhysicalHeight - targetMM;
  long targetSteps = mmFromTop * STEPS_PER_MM; 
 
  stepper.moveTo(targetSteps);
 }
 
-// Homing routine sequence for Z-axis using the top endstop
 void executeHome(bool silent) {
  if(!silent) {
  display.clearDisplay();
@@ -793,10 +764,10 @@ void executeHome(bool silent) {
  display.display();
  }
 
- stepper.setMaxSpeed(1500);
+ stepper.setMaxSpeed(4000); // 1500
 
  // 1. DRIVE FAST TOWARDS TOP
- stepper.setSpeed(-1200); 
+ stepper.setSpeed(-4000); // -1200
  unsigned long endstopActiveTime = 0;
  bool endstopConfirmed = false;
 
@@ -804,7 +775,7 @@ void executeHome(bool silent) {
  stepper.runSpeed(); 
  if (digitalRead(ENDSTOP_TOP) == LOW) {
  if (endstopActiveTime == 0) endstopActiveTime = millis();
- else if (millis() - endstopActiveTime > 20) endstopConfirmed = true;
+  else if (millis() - endstopActiveTime > 20) endstopConfirmed = true;
  } else {
  endstopActiveTime = 0;
  }
@@ -822,7 +793,7 @@ void executeHome(bool silent) {
  stepper.runSpeed();
  if (digitalRead(ENDSTOP_TOP) == HIGH) {
  if (endstopReleasedTime == 0) endstopReleasedTime = millis();
- else if (millis() - endstopReleasedTime > 20) releasedConfirmed = true;
+  else if (millis() - endstopReleasedTime > 20) releasedConfirmed = true;
  } else {
  endstopReleasedTime = 0;
  }
@@ -830,7 +801,7 @@ void executeHome(bool silent) {
  
  long startSteps = stepper.currentPosition();
  stepper.setSpeed(600);
- while (abs(stepper.currentPosition() - startSteps) < 3200) {
+  while (abs(stepper.currentPosition() - startSteps) < 3200) {
  stepper.runSpeed();
  }
  delay(300); 
@@ -844,7 +815,7 @@ void executeHome(bool silent) {
  stepper.runSpeed(); 
  if (digitalRead(ENDSTOP_TOP) == LOW) {
  if (endstopActiveTime == 0) endstopActiveTime = millis();
- else if (millis() - endstopActiveTime > 25) endstopConfirmed = true;
+  else if (millis() - endstopActiveTime > 25) endstopConfirmed = true;
  } else {
  endstopActiveTime = 0;
  }
@@ -858,7 +829,6 @@ void executeHome(bool silent) {
  stepper.setAcceleration(1500);
 }
 
-// Displays a wait message while a hardware movement is processing
 void moveWithWaitMessage() {
  display.clearDisplay();
  display.setTextSize(2);
@@ -874,28 +844,24 @@ void moveWithWaitMessage() {
  saveSettings(); 
 }
 
-// Blocking function ensuring the stepper reaches its target destination
 void hardware_stepper_run_block() {
  while (stepper.distanceToGo() != 0) {
  stepper.run();
  }
 }
 
-// Handles the push-button on the rotary encoder
 void handleButtons() {
  if (digitalRead(ENCODER_SW) == LOW) {
- if (millis() - lastButtonPress > 300) { // Debounce time of 300ms
+  if (millis() - lastButtonPress > 300) { 
  lastButtonPress = millis();
 
  switch(currentState) {
- // --- WIZARD MODES ---
  case WIZARD_WELCOME:
  executeHome();
  currentState = WIZARD_HEIGHT;
  break;
 
  case WIZARD_HOMING:
- // Wait for homing to finish
  break;
 
  case WIZARD_HEIGHT:
@@ -909,11 +875,11 @@ void handleButtons() {
  settings.isCalibrated = true;
  saveSettings();
  currentState = STATUS_SCREEN;
- moveToCalculatedFocus();
+ moveWithWaitMessage();
+ //moveToCalculatedFocus();
  }
  break;
 
- // --- NORMAL NAVIGATION ---
  case STATUS_SCREEN:
  currentState = MAIN_MENU;
  menuIndex = 0;
@@ -922,8 +888,8 @@ void handleButtons() {
  case MAIN_MENU:
  if (menuIndex == 0) { currentState = MAT_HEIGHT_MENU; }
  else if (menuIndex == 1) { 
-   currentState = ENGRAVE_3D_AUTO; // Går direkte til Auto 3D Engraving!
-   engraveAutoSetupStep = 0;       // Starter auto-opsætningen fra trin 0 (Minutter)
+   currentState = ENGRAVE_3D_AUTO; 
+   engraveAutoSetupStep = 0;       
  }
  else if (menuIndex == 2) { currentState = COLOR_MENU; menuIndex = settings.selectedColorIndex; }
  else if (menuIndex == 3) { currentState = LENS_MENU; menuIndex = settings.selectedLens; }
@@ -931,7 +897,6 @@ void handleButtons() {
  else if (menuIndex == 5) { currentState = SETUP_MENU; setupMenuIndex = 0; }
  break;
 
- // --- SETUP MENU ---
  case SETUP_MENU:
  if (setupMenuIndex == 0) {
    executeHome(); 
@@ -945,14 +910,11 @@ void handleButtons() {
    calibrateColorSelectIndex = 0;
    editingColorValue = false;
  } else if (setupMenuIndex == 3) { 
-   // Run Setup Wizard
    currentState = WIZARD_WELCOME;
  } else if (setupMenuIndex == 4) { 
-   // 5. Calibrate Focus (Tidligere "Manual Mode")
    currentState = CALIBRATE_LENS_MENU; 
-   engraveMenuIndex = 0; // Tvinger den ind i Manual opsætningen
+   engraveMenuIndex = 0; 
  } else if (setupMenuIndex == 5) { 
-   // 6. Back / Exit to Main Menu
    currentState = MAIN_MENU;
    menuIndex = 0;
  }
@@ -994,27 +956,44 @@ void handleButtons() {
  currentState = STATUS_SCREEN;
  break;
 
-
- // --- 3D AUTO ENGRAVING ---
  case ENGRAVE_3D_AUTO:
  if (engraveAutoSetupStep < 3) {
- // Toggle between Min -> Sec -> Depth -> Ready
  engraveAutoSetupStep++; 
  } else if (engraveAutoSetupStep == 3 || engraveAutoSetupStep == 6) {
- // If we abort at "Ready" (3) or press OK at "Finished" (6)
  engraveAutoSetupStep = 0; 
  currentState = STATUS_SCREEN; 
  }
  break;
- case MAT_HEIGHT_MENU:
+ 
+ // ---- Her er ændringen for CALIBRATE_LENS_MENU ----
  case CALIBRATE_LENS_MENU:
+ confirmSaveIndex = 0; // Standard-valg er "Ja"
+ currentState = CONFIRM_SAVE_FOCUS;
+ break;
+
+ // ---- Her håndterer vi Ja/Nej valget ----
+ case CONFIRM_SAVE_FOCUS:
+  if (confirmSaveIndex == 0) {
+    // Brugeren valgte "JA"
+    float newFocusDistance = settings.maxPhysicalHeight - (stepper.currentPosition() / STEPS_PER_MM);
+    settings.lensFocusDistances[settings.selectedLens] = newFocusDistance;
+    saveSettings(); 
+    Serial.println("Ny fokusværdi gemt!");
+  } else {
+    // Brugeren valgte "NEJ"
+    Serial.println("Ændring annulleret.");
+  }
+  currentState = SETUP_MENU;
+  break;
+
+ case MAT_HEIGHT_MENU:
  case COLOR_MENU:
  saveSettings(); 
  currentState = STATUS_SCREEN;
  break;
  }
 
- updateDisplay(); // Update the screen immediately after state change
+ updateDisplay(); 
  }
  }
 }
