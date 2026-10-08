@@ -1,8 +1,14 @@
 /*
 * Galvo Fiber Laser Autofocus Control System Ver. 8 (Open-Source Edition)
 * Hardware ESP32-WROOM-DA, OLED SSD1309 display i2c (128x64), EC11 Encoder, Endstop
+* MKS TMC2160-OC Stepper driver
+* 5V 3.3V DC Logic Level Converter Bi-Directional Board Module
+* Nema 23 1.2 N.m.
 * Quick-buttons: 2 on-off-on momentary switch (+10/10 , +1/-1)  
-* Footpedal Button on-off momentary switch 
+* Footpedal Button on-off momentary switch
+* Relay module 5V to activate Lightburn footpedal switch 
+* defined in Lightburn (Start Marking) to start Auto 3D engraving
+* 
 * IDE: Arduino IDE
 */
 
@@ -40,6 +46,7 @@ DIYables_OLED_SSD1309 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define DIR_PIN 26
 #define EN_PIN 27
 
+int confirmSaveIndex = 0;
 
 unsigned long lastInteractionTime = 0;
 const unsigned long SCREENSAVER_TIMEOUT = 300000; // 5 minutter i millisekunder (5 * 60 * 1000)
@@ -78,7 +85,7 @@ const char* colorNames[TOTAL_COLORS] = { "Off", "1", "2", "3", "4" };
 
 // Menu system structures for UI navigation
 enum State { 
-STATUS_SCREEN, MAIN_MENU, MAT_HEIGHT_MENU, LENS_MENU, ENGRAVE_3D_SELECT, ENGRAVE_3D_MENU, ENGRAVE_3D_AUTO, COLOR_MENU, 
+STATUS_SCREEN, MAIN_MENU, MAT_HEIGHT_MENU, LENS_MENU, ENGRAVE_3D_MENU, ENGRAVE_3D_AUTO, COLOR_MENU, 
 SETUP_MENU, CALIBRATE_HEIGHT_MENU, CALIBRATE_LENS_MENU, COLOR_OFFSET_MENU, 
 WIZARD_WELCOME, WIZARD_HOMING, WIZARD_HEIGHT, WIZARD_LENSES 
 };
@@ -116,13 +123,14 @@ const char* menuItems[MENU_ITEMS_COUNT] = {
 };
 
 int setupMenuIndex = 0;
-const int SETUP_MENU_COUNT = 5; 
+const int SETUP_MENU_COUNT = 6; 
 const char* setupMenuItems[SETUP_MENU_COUNT] = {
  "1. Calibrate Max H",
  "2. Edit Lens Focus",
  "3. Edit Color Offsets",
  "4. Run Setup Wizard",
- "5. Back / Exit"
+ "5. Calibrate Focus",
+ "6. Back / Exit"
 };
 
 // Variables for the color menu
@@ -383,10 +391,6 @@ lastInteractionTime = millis(); // Nulstil screensaver timer
  break; 
  } 
 
- case ENGRAVE_3D_SELECT:
- engraveMenuIndex = constrain(engraveMenuIndex + direction, 0, 1);
- break;
- 
  case ENGRAVE_3D_AUTO:
  if (engraveAutoSetupStep == 0) {
  engraveAutoMinutes = constrain(engraveAutoMinutes + direction, 0, 59);
@@ -613,17 +617,6 @@ if (currentState != SETUP_MENU && currentState != ENGRAVE_3D_AUTO) {
  display.print("# "); 
  display.print(settings.selectedColorIndex); // Added mapping offset
  }
- break;
-
- case ENGRAVE_3D_SELECT:
- display.setCursor(10, 17); display.print("3D Engraving Mode:");
- display.setCursor(10, 26);
- if (engraveMenuIndex == 0) display.print("> Manual mode");
- else display.print(" Manual mode");
- 
- display.setCursor(10, 41);
- if (engraveMenuIndex == 1) display.print("> Auto mode");
- else display.print(" Auto mode");
  break;
 
  case ENGRAVE_3D_AUTO: {
@@ -928,33 +921,40 @@ void handleButtons() {
 
  case MAIN_MENU:
  if (menuIndex == 0) { currentState = MAT_HEIGHT_MENU; }
- else if (menuIndex == 1) { currentState = ENGRAVE_3D_SELECT; engraveMenuIndex = 0; }
+ else if (menuIndex == 1) { 
+   currentState = ENGRAVE_3D_AUTO; // Går direkte til Auto 3D Engraving!
+   engraveAutoSetupStep = 0;       // Starter auto-opsætningen fra trin 0 (Minutter)
+ }
  else if (menuIndex == 2) { currentState = COLOR_MENU; menuIndex = settings.selectedColorIndex; }
  else if (menuIndex == 3) { currentState = LENS_MENU; menuIndex = settings.selectedLens; }
- else if (menuIndex == 4) { executeHome(); moveToCalculatedFocus(); currentState = STATUS_SCREEN; }
+ else if (menuIndex == 4) { executeHome(); moveWithWaitMessage(); currentState = STATUS_SCREEN; }
  else if (menuIndex == 5) { currentState = SETUP_MENU; setupMenuIndex = 0; }
  break;
 
  // --- SETUP MENU ---
  case SETUP_MENU:
  if (setupMenuIndex == 0) {
- executeHome(); 
- currentState = CALIBRATE_HEIGHT_MENU;
+   executeHome(); 
+   currentState = CALIBRATE_HEIGHT_MENU;
  } else if (setupMenuIndex == 1) {
- currentState = CALIBRATE_LENS_MENU;
- calibrateLensSelectIndex = 0;
- editingLensValue = false;
+   currentState = CALIBRATE_LENS_MENU;
+   calibrateLensSelectIndex = 0;
+   editingLensValue = false;
  } else if (setupMenuIndex == 2) {
- currentState = COLOR_OFFSET_MENU;
- calibrateColorSelectIndex = 0;
- editingColorValue = false;
+   currentState = COLOR_OFFSET_MENU;
+   calibrateColorSelectIndex = 0;
+   editingColorValue = false;
  } else if (setupMenuIndex == 3) { 
- // Run Setup Wizard
- currentState = WIZARD_WELCOME;
+   // Run Setup Wizard
+   currentState = WIZARD_WELCOME;
  } else if (setupMenuIndex == 4) { 
- // Back / Exit to Main Menu
- currentState = MAIN_MENU;
- menuIndex = 0;
+   // 5. Calibrate Focus (Tidligere "Manual Mode")
+   currentState = ENGRAVE_3D_MENU; 
+   engraveMenuIndex = 0; // Tvinger den ind i Manual opsætningen
+ } else if (setupMenuIndex == 5) { 
+   // 6. Back / Exit to Main Menu
+   currentState = MAIN_MENU;
+   menuIndex = 0;
  }
  break;
 
@@ -992,15 +992,6 @@ void handleButtons() {
  case LENS_MENU:
  moveWithWaitMessage(); 
  currentState = STATUS_SCREEN;
- break;
-
- case ENGRAVE_3D_SELECT:
- if (engraveMenuIndex == 0) {
- currentState = ENGRAVE_3D_MENU; // Go to Manual
- } else {
- currentState = ENGRAVE_3D_AUTO; // Go to Auto
- engraveAutoSetupStep = 0; // Ensure we always start on "Minutes"
- }
  break;
 
 
