@@ -11,7 +11,7 @@ This system makes it easy to motorize the Z-axis of your fiber laser. It feature
 * **Material Height:** Input the thickness of your workpiece, and the Z-axis adjusts accordingly.
 * **Steel Color Offsets:** Save up to 4 unique Z-offsets to achieve perfect tempering colors on steel. Includes a quick "Off" function to disable offsets.
 * **3D Auto Engraving:** Set the depth, minutes, and seconds. The system gradually lowers the Z-axis automatically during engraving, activated and safely monitored via a foot pedal.
-* **Quick Buttons:** 4 physical push-buttons for quick (+10mm, -10mm, +1mm, -1mm).
+* **Quick Buttons:** 2 on-off-on momentary switch push-buttons for easy data entry with high numbers (+10mm, -10mm, +1mm, -1mm).
 * **Auto-Homing:** Automatically finds the top position using an endstop switch on startup.
 
 ---
@@ -22,7 +22,7 @@ This system makes it easy to motorize the Z-axis of your fiber laser. It feature
 * **Motor Control:** Stepper motor driver (e.g., TMC2160) + Stepper Motor
 * **Navigation:** EC11 Rotary Encoder with push-button
 * **Safety/Homing:** Endstop switch (Top limit)
-* **Manual Control:** 4x Push-buttons (for Jogging)
+* **Easy data entry:** 2 x on-off-on momentary switch
 * **3D Engraving:** Foot pedal and a 3V/5V Relay module
 
 ---
